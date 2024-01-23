@@ -86,7 +86,41 @@ export class AuthService {
     return tokens;
   }
 
-  logout() {}
+  async logout(userId: string) {
+    await this.databaseService.user.updateMany({
+      where: {
+        id: userId,
+        hashedRt: {
+          not: null,
+        },
+      },
+      data: { hashedRt: null },
+    });
+  }
 
-  refreshToken() {}
+  async refreshToken(userId: string, refreshToken: string) {
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new ForbiddenException('Access Denied!');
+    }
+
+    console.log({ data: refreshToken, hashed: user.hashedRt });
+
+    const refreshTokensMatch = await bcrypt.compare(
+      refreshToken,
+      user.hashedRt,
+    );
+
+    if (!refreshTokensMatch) {
+      throw new ForbiddenException('Access Denied!');
+    }
+
+    const tokens = await this.getTokens(user.id, user.email, user.fullName);
+
+    await this.updateHashedRt(user.id, tokens.refresh_token);
+    return tokens;
+  }
 }
